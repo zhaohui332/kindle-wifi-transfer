@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*.bak
+.buildozer/
+bin/
+*.apk
+.DS_Store
+*.log
