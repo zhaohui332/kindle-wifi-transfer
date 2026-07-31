@@ -1,0 +1,35 @@
+name: Build Kindle WiFi APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Buildozer
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-${{ runner.os }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade buildozer cython
+
+      - name: Build APK
+        run: |
+          buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kindle传书-APK
+          path: android-app/bin/*.apk
