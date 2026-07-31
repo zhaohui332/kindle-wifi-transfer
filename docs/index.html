@@ -160,6 +160,39 @@ async function listBooks() {
   renderBooks();
 }
 
+function b64EncodeUnicode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin);
+}
+
+async function updateKindlePage() {
+  try {
+    const t = getToken();
+    if (!t) return;
+    const rows = files.map(f => {
+      const rawUrl = RAW + '/' + OWNER + '/' + REPO + '/' + BRANCH + '/books/' + encodeURIComponent(f.name);
+      const sz = f.size ? fmtSize(f.size) : '';
+      return '<tr><td><a href="' + rawUrl + '">' + esc(f.name) + '</a></td><td>' + sz + '</td></tr>';
+    }).join('');
+    const html = '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>Kindle 传书</title>\n</head>\n<body style="font-family:sans-serif;max-width:600px;margin:16px auto;padding:0 10px">\n<h2>Kindle 传书</h2>\n<p style="font-size:13px;color:#666">点击文件名下载到 Kindle</p>\n<table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse">\n<tr><th style="background:#eee">文件名</th><th style="background:#eee">大小</th></tr>\n' + rows + '\n</table>\n<p style="font-size:11px;color:#999;margin-top:20px">手机打开主页上传电子书</p>\n</body>\n</html>';
+
+    let sha = null;
+    const existing = await gh('GET', '/repos/' + OWNER + '/' + REPO + '/contents/docs/kindle.html');
+    if (existing && existing.sha) sha = existing.sha;
+
+    const payload = {
+      message: '更新 Kindle 页面',
+      content: b64EncodeUnicode(html)
+    };
+    if (sha) payload.sha = sha;
+    await gh('PUT', '/repos/' + OWNER + '/' + REPO + '/contents/docs/kindle.html', payload);
+  } catch(e) {
+    console.error('Kindle page update failed', e);
+  }
+}
+
 function renderBooks() {
   const el = document.getElementById('bookList');
   document.getElementById('count').textContent = '(' + files.length + ')';
@@ -185,7 +218,7 @@ async function delBook(sha, name) {
   if (!confirm('删除 ' + name + '？')) return;
   const r = await gh('DELETE', '/repos/' + OWNER + '/' + REPO + '/contents/books/' + encodeURIComponent(name),
     {message: '删除 ' + name, sha: sha});
-  if (r) { showToast('✅ 已删除'); listBooks(); }
+  if (r) { showToast('✅ 已删除'); await listBooks(); updateKindlePage(); }
   else showToast('❌ 删除失败');
 }
 
@@ -207,7 +240,8 @@ async function uploadBooks(files) {
   prog.style.display = 'none'; pBar.style.width = '0%';
   document.getElementById('uploadStatus').textContent = '';
   showToast('✅ 上传了 ' + done + '/' + files.length + ' 本');
-  listBooks();
+  await listBooks();
+  updateKindlePage();
 }
 
 function fileToBase64(f) {
